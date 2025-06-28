@@ -97,7 +97,7 @@ from . import _greeting
 
 if __name__ == '__main__':
     almanet.serve_multiple(
-        almanet.clients.ansqd_tcp_client("localhost:4150"), # message broker addresses
+        almanet.transports.ansqd_tcp_transport("localhost:4150"), # message broker addresses
         _greeting.public.service,
     )
 ```

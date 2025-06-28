@@ -123,7 +123,7 @@ class remote_procedure_model[I, O](_shared.procedure_model[I, O]):
         """
         _session.logger.debug(f"local calling {self.uri}")
 
-        session = _session.get_active_session()
+        session = get_active_session(self.service)
 
         force_local = kwargs.pop("force_local", True)
         if self._has_implementation and force_local:
@@ -175,14 +175,43 @@ class remote_procedure_model[I, O](_shared.procedure_model[I, O]):
         return procedure
 
 
+_service_active_sessions = {}
+
+
+def get_active_session(
+    service: "remote_service",
+) -> "remote_service_session":
+    session = _service_active_sessions.get(service.pre)
+    if session is None:
+        raise RuntimeError(f"active session for service {service.pre} not found")
+    return session
+
+
+class remote_service_session(_session.Almanet):
+
+    def __init__(self, service: "remote_service", *args, **kwargs):
+        self._remote_service = service
+        super().__init__(*args, **kwargs)
+
+    async def join(self, *args, **kwargs):
+        _service_active_sessions[self._remote_service.pre] = self
+        return await super().join(*args, **kwargs)
+
+    async def leave(self, *args, **kwargs):
+        _service_active_sessions.pop(self._remote_service.pre, None)
+        return await super().leave(*args, **kwargs)
+
+
 class remote_service:
     def __init__(
         self,
         prepath: str,
+        transport: _session.transport_iface,
         tags: set[str] | None = None,
         include_to_api: bool = False,
     ) -> None:
         self.pre: str = prepath
+        self.transport = transport
         self.default_tags: set[str] = set(tags or [])
         self.include_to_api: bool = include_to_api
         self.procedures: list[remote_procedure_model] = []
@@ -337,6 +366,9 @@ class remote_service:
 
         if self.include_to_api:
             self._share_self_schema(session)
+
+    def connect(self) -> remote_service_session:
+        return remote_service_session(self, self.transport)
 
 
 new_remote_service = remote_service

@@ -9,12 +9,12 @@ if typing.TYPE_CHECKING:
     from ansq.tcp.types import NSQMessage
 
 __all__ = [
-    "ansqd_tcp_client",
+    "ansqd_tcp_transport",
     "make_ansqd_tcp_session",
 ]
 
 
-class ansqd_tcp_client:
+class ansqd_tcp_transport:
 
     def __init__(
         self,
@@ -28,8 +28,8 @@ class ansqd_tcp_client:
 
         self.addresses = addresses
 
-    def clone(self) -> "ansqd_tcp_client":
-        return ansqd_tcp_client(*self.addresses)
+    def clone(self) -> "ansqd_tcp_transport":
+        return ansqd_tcp_transport(*self.addresses)
 
     async def connect(self) -> None:
         self.writer = await ansq.create_writer(
@@ -80,5 +80,5 @@ class ansqd_tcp_client:
 
 
 def make_ansqd_tcp_session(*addresses: str) -> _session.Almanet:
-    client = ansqd_tcp_client(*addresses)
-    return _session.Almanet(client)
+    transport = ansqd_tcp_transport(*addresses)
+    return _session.Almanet(transport)
