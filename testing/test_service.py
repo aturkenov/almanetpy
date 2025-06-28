@@ -9,7 +9,10 @@ import almanet
 import pydantic
 
 
-testing_service = almanet.remote_service("net.testing.microservice")
+testing_service = almanet.remote_service(
+    "net.testing.microservice",
+    almanet.transports.ansqd_tcp_transport("localhost:4150"),
+)
 
 
 class access_denied_payload(pydantic.BaseModel):
@@ -87,7 +90,6 @@ async def _test_interruption_signal():
 
 async def test_service():
     almanet.serve_single(
-        almanet.clients.ansqd_tcp_client("localhost:4150"),
         testing_service,
         stop_loop_on_exit=False,
     )
