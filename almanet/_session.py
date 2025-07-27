@@ -298,8 +298,8 @@ class Almanet:
         uri: str,
         payload,
         delay: int = 0,
-    ) -> None:
-        self._background_tasks.schedule(self._delay_call(uri, payload, delay))
+    ) -> asyncio.Task[None]:
+        return self._background_tasks.schedule(self._delay_call(uri, payload, delay))
 
     async def _call(
         self,
