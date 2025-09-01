@@ -8,10 +8,14 @@ Almanet uses NSQ to exchange messages between different sessions. [NSQ](https://
 
 ## Installation
 
-Before install and run NSQD instance [using this instruction](https://nsq.io/overview/quick_start.html).
+Before install NSQD [using this instruction](https://nsq.io/deployment/installing.html).
 
-Then install [`almanet` PyPI package](https://pypi.org/project/almanet/)
+And run it [(configuration options)](https://nsq.io/components/nsqd.html):
+```sh
+nsqd --max-msg-timeout=1h
+```
 
+Then install [`almanet` PyPI package](https://pypi.org/project/almanet/):
 ```sh
 pip install almanet
 ```

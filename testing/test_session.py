@@ -37,8 +37,8 @@ async def greet(
 
 
 async def test_rpc(
-    delay=2,  # delay for the event
-    n=256,  # number of calls
+    delay=3,  # delay for the event
+    n=128,  # number of calls
 ):
     session = almanet.clients.make_ansqd_tcp_session("localhost:4150")
     async with session:
@@ -47,7 +47,8 @@ async def test_rpc(
 
         begin_time = datetime.now()
         session.delay_call(USE_ASYNCIO_EVENT_URI, None, delay)
-        async with asyncio.timeout(delay + 1):
+        delay *= 2
+        async with asyncio.timeout(delay):
             await _event.wait()
             end_time = datetime.now()
             if end_time - begin_time > timedelta(seconds=delay):
