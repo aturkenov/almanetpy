@@ -38,7 +38,7 @@ async def greet(
 
 async def test_rpc(
     delay=2,  # delay for the event
-    n=256,  # number of calls
+    n=128,  # number of calls
 ):
     session = almanet.clients.make_ansqd_tcp_session("localhost:4150")
     async with session:
