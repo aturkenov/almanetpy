@@ -1,4 +1,4 @@
-FROM python:3.12-bookworm
+FROM python:3.12-trixie
 
 ENV TZ=UTC
 
@@ -22,5 +22,4 @@ RUN poetry install --with testing --no-interaction --no-root
 
 COPY . .
 
-RUN nsqd --max-msg-timeout=1h \
-    & pytest -x
+RUN nsqd --max-msg-timeout=1h & pytest -x
