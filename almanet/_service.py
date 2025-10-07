@@ -170,6 +170,7 @@ class remote_procedure_model[I, O](_shared.procedure_model[I, O]):
             channel=self.channel,
             exceptions=self.exceptions,
         )
+        self.function = procedure.function
 
         self._has_implementation = True
 
