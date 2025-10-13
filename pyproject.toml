@@ -6,9 +6,9 @@ authors = ["aturkenov"]
 readme = "README.md"
 license = "MIT"
 keywords = ["Almanet", "PubSub", "RPC"]
-homepage = "https://github.com/aturkenov/almanet"
-documentation = "https://github.com/aturkenov/almanet"
-repository = "https://github.com/aturkenov/almanet"
+homepage = "https://github.com/aturkenov/almanetpy"
+documentation = "https://github.com/aturkenov/almanetpy"
+repository = "https://github.com/aturkenov/almanetpy"
 classifiers = [
     "Topic :: System :: Distributed Computing",
     "Topic :: Software Development :: Object Brokering",
