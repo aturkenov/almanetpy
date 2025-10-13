@@ -41,7 +41,6 @@ async def greet(
             )
         )
     if payload == "not_exist":
-        await asyncio.sleep(2)
         raise access_denied(
             access_denied_payload(
                 reason="user not found",
@@ -49,6 +48,18 @@ async def greet(
             )
         )
     return f"Hello, {payload}!"
+
+
+@testing_service.procedure
+async def long_operation(
+    payload: float,
+    session: almanet.Almanet,
+) -> None:
+    if not isinstance(session, almanet.Almanet):
+        pytest.fail("session is not an instance of almanet")
+    almanet.logger.debug(f"sleeping {payload} seconds")
+    await asyncio.sleep(payload)
+    return None
 
 
 _ready_to_exit = asyncio.Event()
@@ -63,11 +74,7 @@ async def __post_join(session: almanet.Almanet):
     result = await greet(payload, force_local=False)
     assert result == expected_result
 
-    # catch timeout error
-    with pytest.raises(asyncio.TimeoutError):
-        await greet("not_exist", force_local=False, timeout=1)  # type: ignore
-
-    # catch validation error
+    # test validation
     with pytest.raises(almanet.rpc_invalid_payload):
         await greet(123, force_local=False)  # type: ignore
 
@@ -75,10 +82,21 @@ async def __post_join(session: almanet.Almanet):
         await greet("guest", force_local=False)
 
         raise Exception("invalid behavior")
-    # catch custom exception
+    # test custom exception
     except access_denied as e:
         assert isinstance(e.payload.reason, str)
         assert isinstance(e.payload.datetime, datetime)
+
+    # test timeout
+    with pytest.raises(asyncio.TimeoutError):
+        await long_operation(2, force_local=False, timeout=1)
+
+    # test timeout
+    with pytest.raises(asyncio.TimeoutError):
+        await long_operation(4, force_local=False, timeout=1)
+
+    # test long operation
+    await long_operation(61, force_local=False, timeout=120)
 
     _ready_to_exit.set()
 

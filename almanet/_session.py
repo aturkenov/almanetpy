@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime, timedelta, UTC
 import logging
 import typing
 
@@ -32,6 +33,10 @@ class qmessage_model[T: bytes]:
     attempts: int
     commit: typing.Callable[[], typing.Awaitable[None]]
     rollback: typing.Callable[[], typing.Awaitable[None]]
+
+    @property
+    def time(self) -> datetime:
+        return datetime.fromtimestamp(self.timestamp, UTC)
 
 
 type returns_consumer[T: bytes] = tuple[typing.AsyncIterable[qmessage_model[T]], typing.Callable[[], None]]
@@ -69,6 +74,9 @@ class transport_iface(typing.Protocol):
         raise NotImplementedError()
 
 
+DEFAULT_TIMEOUT_SECONDS = 60
+
+
 @_shared.dataclass(slots=True)
 class invoke_event_model:
     """
@@ -79,11 +87,7 @@ class invoke_event_model:
     caller_id: str
     payload: bytes
     reply_topic: str
-
-    @property
-    def expired(self) -> bool:
-        # TODO
-        return False
+    expires: int = DEFAULT_TIMEOUT_SECONDS
 
 
 @_shared.dataclass(slots=True)
@@ -115,7 +119,9 @@ class rpc_exception(Exception):
         self.payload = payload
 
     def __str__(self) -> str:
-        return f"{self.name}: {self.payload}"
+        return f"{self.name}({self.payload})"
+
+    __repr__ = __str__
 
 
 @_shared.dataclass(slots=True)
@@ -279,12 +285,14 @@ class Almanet:
         /,
         _invocation_id: str | None = None,
         _reply_topic: str = "",
+        _expires: int = 60,
     ) -> None:
         invocation = invoke_event_model(
             id=_invocation_id or _shared.new_id(),
             caller_id=self.id,
             payload=_shared.dump(payload),
             reply_topic=_reply_topic,
+            expires=_expires,
         )
 
         __log_extra = {"invoke_event": str(invocation)}
@@ -296,15 +304,15 @@ class Almanet:
         self,
         uri: str,
         payload,
-        delay: int = 0,
-    ) -> None:
-        self._background_tasks.schedule(self._delay_call(uri, payload, delay))
+        delay: int = 0, # seconds
+    ) -> asyncio.Task[None]:
+        return self._background_tasks.schedule(self._delay_call(uri, payload, delay))
 
     async def _call(
         self,
         uri: str,
         payload,
-        timeout: int = 60,
+        timeout: int = DEFAULT_TIMEOUT_SECONDS,
     ) -> reply_event_model:
         invocation_id = _shared.new_id()
 
@@ -320,6 +328,7 @@ class Almanet:
                     payload,
                     _invocation_id=invocation_id,
                     _reply_topic=self.reply_topic,
+                    _expires=timeout,
                 )
 
                 reply_event = await pending_reply_event
@@ -357,7 +366,7 @@ class Almanet:
         self,
         uri: str,
         payload,
-        timeout: int = 60,
+        timeout: int = DEFAULT_TIMEOUT_SECONDS,
     ) -> list[reply_event_model]:
         reply_topic = f"_rpc_._replies_.{_shared.new_id()}#ephemeral"
 
@@ -406,7 +415,7 @@ class Almanet:
         """
         return self._background_tasks.schedule(self._multicall(uri, payload, **kwargs))
 
-    async def _on_message(
+    async def __execution(
         self,
         registration: registration_model,
         message: qmessage_model[bytes],
@@ -416,17 +425,32 @@ class Almanet:
         try:
             invocation = serializer(message.body)
             __log_extra["invocation"] = str(invocation)
-            logger.debug("new invocation", extra=__log_extra)
 
-            if invocation.expired:
-                logger.warning("invocation expired", extra=__log_extra)
-            else:
+            expiration_time = message.time + timedelta(seconds=invocation.expires)
+
+            def check_expiration():
+                current_time = datetime.now(UTC)
+                delta = expiration_time - current_time
+                if delta.total_seconds() <= 0:
+                    raise TimeoutError(
+                        f"invocation expired after execution! delay={delta}s"
+                    )
+                return delta.total_seconds()
+
+            logger.debug(f"new invocation {expiration_time=}", extra=__log_extra)
+
+            remaining_seconds = check_expiration()
+
+            async with asyncio.timeout(remaining_seconds):
                 reply_event = await registration.execute(invocation)
-                if len(invocation.reply_topic) > 0:
-                    logger.debug(f"trying to reply {registration.uri}", extra=__log_extra)
-                    await self._produce(invocation.reply_topic, reply_event)
-        except:
-            logger.exception("during execute invocation", extra=__log_extra)
+
+            check_expiration()
+
+            if len(invocation.reply_topic) > 0:
+                logger.debug(f"trying to reply {registration.uri}", extra=__log_extra)
+                await self._produce(invocation.reply_topic, reply_event)
+        except Exception as e:
+            logger.error(f"during execute invocation {e!r}", extra=__log_extra)
         finally:
             await message.commit()
             logger.debug("successful commit", extra=__log_extra)
@@ -438,7 +462,7 @@ class Almanet:
         logger.debug(f"trying to register {registration.uri}:{registration.channel}")
         messages_stream, _ = await self.consume(f"_rpc_.{registration.uri}", registration.channel)
         async for message in messages_stream:
-            self._background_tasks.schedule(self._on_message(registration, message))
+            self._background_tasks.schedule(self.__execution(registration, message))
             if not self.joined:
                 break
         logger.debug(f"consumer {registration.uri} down")

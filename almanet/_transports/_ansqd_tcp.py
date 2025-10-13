@@ -57,7 +57,7 @@ class ansqd_tcp_transport:
         async for ansq_message in ansq_messages_stream:
             almanet_message = _session.qmessage_model(
                 id=ansq_message.id,
-                timestamp=ansq_message.timestamp,
+                timestamp=ansq_message.timestamp / 1_000_000_000,
                 body=ansq_message.body,
                 attempts=ansq_message.attempts,
                 commit=ansq_message.fin,
@@ -69,9 +69,15 @@ class ansqd_tcp_transport:
         self,
         topic: str,
         channel: str,
+        timeout: float = 3600,  # 1 hour (in seconds)
     ) -> _session.returns_consumer:
         reader = await ansq.create_reader(
-            nsqd_tcp_addresses=self.addresses, topic=topic, channel=channel, connection_options=ansq.ConnectionOptions()
+            nsqd_tcp_addresses=self.addresses,
+            topic=topic,
+            channel=channel,
+            connection_options=ansq.ConnectionOptions(
+                features=ansq.ConnectionFeatures(msg_timeout=round(timeout * 1000))
+            ),
         )
         messages_stream = reader.messages()
         messages_stream = self._convert_ansq_message(messages_stream)

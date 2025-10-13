@@ -121,12 +121,13 @@ class remote_procedure_model[I, O](_shared.procedure_model[I, O]):
         Args:
         - force_local: if True, force local execution
         """
-        _session.logger.debug(f"local calling {self.uri}")
+        _session.logger.debug(f"local execution {self.uri}")
 
         session = get_active_session(self.service)
 
         force_local = kwargs.pop("force_local", True)
         if self._has_implementation and force_local:
+            _session.logger.debug(f"local calling {self.uri}")
             return await self.execute(payload, session)
 
         try:
@@ -169,6 +170,7 @@ class remote_procedure_model[I, O](_shared.procedure_model[I, O]):
             channel=self.channel,
             exceptions=self.exceptions,
         )
+        self.function = procedure.function
 
         self._has_implementation = True
 
