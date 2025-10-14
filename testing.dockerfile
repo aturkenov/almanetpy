@@ -22,4 +22,4 @@ RUN poetry install --with testing --no-interaction --no-root
 
 COPY . .
 
-RUN nsqd --max-msg-timeout=1h & pytest -x
+RUN nsqd & pytest -x
