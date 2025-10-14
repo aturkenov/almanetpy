@@ -28,10 +28,10 @@ class ansqd_tcp_client:
 
         self.addresses = addresses
 
-        if not isinstance(message_timeout_seconds, float):
+        try:
+            self.message_timeout_seconds = float(message_timeout_seconds)
+        except Exception:
             raise ValueError("`message_timeout_seconds` must be float")
-
-        self.message_timeout_seconds = message_timeout_seconds
 
     def clone(self) -> "ansqd_tcp_client":
         return ansqd_tcp_client(*self.addresses)
