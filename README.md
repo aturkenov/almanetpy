@@ -12,7 +12,7 @@ Before install NSQD [using this instruction](https://nsq.io/deployment/installin
 
 And run it [(configuration options)](https://nsq.io/components/nsqd.html):
 ```sh
-nsqd --max-msg-timeout=1h
+nsqd
 ```
 
 Then install [`almanet` PyPI package](https://pypi.org/project/almanet/):

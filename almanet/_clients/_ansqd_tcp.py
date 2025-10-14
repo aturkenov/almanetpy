@@ -18,6 +18,7 @@ class ansqd_tcp_client:
     def __init__(
         self,
         *addresses: str,
+        message_timeout_seconds: float = 60,
     ):
         if len(addresses) == 0:
             raise ValueError("at least one address must be specified")
@@ -26,6 +27,11 @@ class ansqd_tcp_client:
             raise ValueError("addresses must be a iterable of strings")
 
         self.addresses = addresses
+
+        if not isinstance(message_timeout_seconds, float):
+            raise ValueError("`message_timeout_seconds` must be float")
+
+        self.message_timeout_seconds = message_timeout_seconds
 
     def clone(self) -> "ansqd_tcp_client":
         return ansqd_tcp_client(*self.addresses)
@@ -68,14 +74,15 @@ class ansqd_tcp_client:
         self,
         topic: str,
         channel: str,
-        timeout: float = 3600,  # 1 hour (in seconds)
     ) -> _session.returns_consumer:
         reader = await ansq.create_reader(
             nsqd_tcp_addresses=self.addresses,
             topic=topic,
             channel=channel,
             connection_options=ansq.ConnectionOptions(
-                features=ansq.ConnectionFeatures(msg_timeout=round(timeout * 1000))
+                features=ansq.ConnectionFeatures(
+                    msg_timeout=round(self.message_timeout_seconds * 1000)
+                )
             ),
         )
         messages_stream = reader.messages()
