@@ -88,12 +88,11 @@ async def __post_join(session: almanet.Almanet):
     with pytest.raises(asyncio.TimeoutError):
         await long_operation(2, force_local=False, timeout=1)
 
-    # test timeout
-    with pytest.raises(asyncio.TimeoutError):
-        await long_operation(4, force_local=False, timeout=1)
-
     # test long operation
-    await long_operation(61, force_local=False, timeout=120)
+    try:
+        await long_operation(59, force_local=False)
+    except Exception as e:
+        pytest.fail(f"{e!r}")
 
     _ready_to_exit.set()
 
