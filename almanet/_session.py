@@ -87,7 +87,7 @@ class invoke_event_model:
     caller_id: str
     payload: bytes
     reply_topic: str
-    expires: int = DEFAULT_TIMEOUT_SECONDS
+    expires: datetime
 
 
 @_shared.dataclass(slots=True)
@@ -285,14 +285,16 @@ class Almanet:
         /,
         _invocation_id: str | None = None,
         _reply_topic: str = "",
-        _expires: int = 60,
+        _timeout: int = 60,
     ) -> None:
+        current_time = datetime.now(UTC)
+
         invocation = invoke_event_model(
             id=_invocation_id or _shared.new_id(),
             caller_id=self.id,
             payload=_shared.dump(payload),
             reply_topic=_reply_topic,
-            expires=_expires,
+            expires=current_time + timedelta(seconds=_timeout),
         )
 
         __log_extra = {"invoke_event": str(invocation)}
@@ -328,7 +330,7 @@ class Almanet:
                     payload,
                     _invocation_id=invocation_id,
                     _reply_topic=self.reply_topic,
-                    _expires=timeout,
+                    _timeout=timeout,
                 )
 
                 reply_event = await pending_reply_event
@@ -426,18 +428,15 @@ class Almanet:
             invocation = serializer(message.body)
             __log_extra["invocation"] = str(invocation)
 
-            expiration_time = message.time + timedelta(seconds=invocation.expires)
-
             def check_expiration():
                 current_time = datetime.now(UTC)
-                delta = expiration_time - current_time
-                if delta.total_seconds() <= 0:
+                delta = invocation.expires - current_time
+                remaining_seconds = delta.total_seconds()
+                if remaining_seconds <= 0:
                     raise TimeoutError(
                         f"invocation expired after execution! delay={delta}s"
                     )
-                return delta.total_seconds()
-
-            logger.debug(f"new invocation {expiration_time=}", extra=__log_extra)
+                return remaining_seconds
 
             remaining_seconds = check_expiration()
 

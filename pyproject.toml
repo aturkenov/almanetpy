@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "almanet"
-version = "1.3.2"
+version = "1.3.5"
 description = "Web Messaging Protocol"
 authors = ["aturkenov"]
 readme = "README.md"
