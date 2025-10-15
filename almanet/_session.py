@@ -7,13 +7,12 @@ from . import _shared
 
 __all__ = [
     "logger",
-    "client_iface",
+    "transport_iface",
     "invoke_event_model",
     "qmessage_model",
     "reply_event_model",
     "rpc_exception",
     "Almanet",
-    "get_active_session",
 ]
 
 
@@ -43,12 +42,12 @@ class qmessage_model[T: bytes]:
 type returns_consumer[T: bytes] = tuple[typing.AsyncIterable[qmessage_model[T]], typing.Callable[[], None]]
 
 
-class client_iface(typing.Protocol):
+class transport_iface(typing.Protocol):
     """
     Interface for a client library.
     """
 
-    def clone(self) -> "client_iface":
+    def clone(self) -> "transport_iface":
         raise NotImplementedError()
 
     async def connect(
@@ -177,12 +176,12 @@ class Almanet:
 
     def __init__(
         self,
-        client: client_iface,
+        transport: transport_iface,
     ) -> None:
         self.id = _shared.new_id()
         self.reply_topic = f"_rpc_._reply_.{self.id}#ephemeral"
         self.joined = False
-        self._client = client
+        self._transport = transport
         self._background_tasks = _shared.background_tasks()
         self._post_join_event = _shared.observable_event()
         self._leave_event = _shared.observable_event()
@@ -206,7 +205,7 @@ class Almanet:
 
         try:
             logger.debug(f"trying to produce {uri} topic")
-            await self._client.produce(uri, message_body, delay=delay)
+            await self._transport.produce(uri, message_body, delay=delay)
         except Exception as e:
             logger.exception(f"during produce {uri} topic")
             raise e
@@ -233,7 +232,7 @@ class Almanet:
         """
         logger.debug(f"trying to consume {topic}:{channel}")
 
-        messages_stream, stop_consumer = await self._client.consume(topic, channel)
+        messages_stream, stop_consumer = await self._transport.consume(topic, channel)
 
         def __stop_consumer():
             logger.warning(f"trying to stop consumer {topic}")
@@ -505,7 +504,7 @@ class Almanet:
 
         logger.debug("trying to connect")
 
-        await self._client.connect()
+        await self._transport.connect()
 
         consume_replies_ready = asyncio.Event()
         self._background_tasks.schedule(
@@ -513,8 +512,6 @@ class Almanet:
             daemon=True,
         )
         await consume_replies_ready.wait()
-
-        _active_session.set(self)
 
         self.joined = True
         await self._post_join_event.notify()
@@ -536,8 +533,6 @@ class Almanet:
         if not self.joined:
             raise RuntimeError(f"session {self.id} not joined")
 
-        _active_session.set(None)
-
         self.joined = False
 
         logger.debug(f"trying to leave {self.id} session, reason: {reason}")
@@ -548,20 +543,10 @@ class Almanet:
         await self._leave_event.notify(timeout=timeout)
 
         logger.debug(f"session {self.id} trying to close connection")
-        await self._client.close()
+        await self._transport.close()
 
         logger.warning(f"session {self.id} left")
 
     async def __aexit__(self, etype, evalue, etraceback) -> None:
         if self.joined:
             await self.leave()
-
-
-_active_session = _shared.new_concurrent_context()
-
-
-def get_active_session() -> Almanet:
-    session = _active_session.get(None)
-    if session is None:
-        raise RuntimeError("active session not found")
-    return session

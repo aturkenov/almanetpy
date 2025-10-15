@@ -2,10 +2,7 @@ import asyncio
 import multiprocessing
 import signal
 
-from . import (
-    _service,
-    _session,
-)
+from . import _service
 
 __all__ = [
     "serve_single",
@@ -14,7 +11,6 @@ __all__ = [
 
 
 def serve_single(
-    client: _session.client_iface,
     service: _service.remote_service,
     *,
     stop_loop_on_exit: bool | None = None,
@@ -22,7 +18,7 @@ def serve_single(
     if stop_loop_on_exit is None:
         stop_loop_on_exit = True
 
-    session = _session.Almanet(client)
+    session = service.connect()
 
     async def begin() -> None:
         await session.join()
@@ -44,7 +40,6 @@ def serve_single(
 
 
 def _initialize_new_process(
-    client,
     service_uri: str,
     **kwargs,
 ) -> None:
@@ -52,11 +47,10 @@ def _initialize_new_process(
     if service is None:
         raise ValueError(f"invalid service type {service_uri=}")
 
-    serve_single(client, service, **kwargs)
+    serve_single(service, **kwargs)
 
 
 def serve_multiple(
-    sample_client: _session.client_iface,
     *services: _service.remote_service,
     **kwargs,
 ) -> None:
@@ -68,10 +62,9 @@ def serve_multiple(
 
     processes: list[multiprocessing.Process] = []
     for s in services:
-        client4process = sample_client.clone()
         process = multiprocessing.Process(
             target=_initialize_new_process,
-            args=(client4process, s.pre),
+            args=[s.pre],
             kwargs=kwargs,
         )
         process.start()

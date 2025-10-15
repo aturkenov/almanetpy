@@ -1,13 +1,11 @@
 import asyncio
 
-import almanet
 import guide.microservice
 
 
 async def main():
     # join to your network.
-    session = almanet.clients.make_ansqd_tcp_session("localhost:4150")
-    async with session:
+    async with guide.microservice.greeting_remote_service.connect():
         payload = "Aidar"
 
         # catching rpc exceptions with `try` and `except almanet.remote_exception` statement

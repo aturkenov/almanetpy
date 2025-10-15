@@ -29,14 +29,17 @@ __all__ = [
     "greet",
 ]
 
-service = almanet.new_remote_service(__name__)
+remote_service = almanet.new_remote_service(
+    __package__ or "net.example.greeting",
+    almanet.transports.ansqd_tcp_transport("localhost:4150"), # message broker addresses
+)
 
 
 class access_denied(almanet.remote_exception):
     """Custom RPC exception"""
 
 
-@service.public_procedure
+@remote_service.public_procedure
 async def greet(payload: str) -> str:
     """
     Procedure that returns greeting message.
@@ -85,20 +88,20 @@ where `public.greet` is a reference to the abstract `greet` procedure defined in
 
 **Protected Module**: This file is meant for internal use only, so it should not be imported directly by external modules. Only protected or private modules can import this file.
 
-### 3. Microservice File (`__microservice.py`)
+### 3. Microservice File (`__demon.py`)
 
 The microservice file is the entry point to run the microservice. It contains the logic that starts the service and listens for incoming messages.
 
 ```python
-# __microservice.py
+# __demon.py
 import almanet
 
 from . import _greeting
 
 if __name__ == '__main__':
     almanet.serve_multiple(
-        almanet.clients.ansqd_tcp_client("localhost:4150"), # message broker addresses
-        _greeting.public.service,
+        _greeting.public.remote_service,
+        # etc...
     )
 ```
 
@@ -112,14 +115,14 @@ where the `services` parameter is a list of implemented (protected) services.
 To run the greeting microservice, you can execute the following command:
 
 ```bash
-python -m guide.microservice.__microservice
+python -m guide.microservice.__demon
 ```
 
 ### Microservice Architecture Summary
 
 - **`greeting.py`**: Public header file containing the interfaces to be used by other modules.
 - **`_greeting.py`**: Implementation file containing the logic for the interfaces, for internal use only.
-- **`__microservice.py`**: Private microservice file that starts the microservice, and is not intended to be imported by other modules.
+- **`__demon.py`**: Private microservice file that starts the microservice, and is not intended to be imported by other modules.
 
 By following this structure, we ensure that each component of the microservice is isolated based on its access level, maintaining a clean and modular design that is easy to scale and maintain.
 
