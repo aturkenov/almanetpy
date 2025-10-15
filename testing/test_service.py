@@ -70,7 +70,11 @@ async def __post_join(session: almanet.Almanet):
     payload = "Almanet"
     expected_result = "Hello, Almanet!"
 
-    # happy path
+    # calling locally
+    result = await greet(payload)
+    assert result == expected_result
+
+    # calling remotely
     result = await greet(payload, force_local=False)
     assert result == expected_result
 

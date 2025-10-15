@@ -13,12 +13,9 @@ __all__ = [
 def serve_single(
     service: _service.remote_service,
     *,
-    stop_loop_on_exit: bool | None = None,
+    stop_loop_on_exit: bool = True,
 ) -> None:
-    if stop_loop_on_exit is None:
-        stop_loop_on_exit = True
-
-    session = service.connect()
+    session = service.make_session()
 
     async def begin() -> None:
         await session.join()

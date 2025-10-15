@@ -123,7 +123,7 @@ class remote_procedure_model[I, O](_shared.procedure_model[I, O]):
         """
         _session.logger.debug(f"local execution {self.uri}")
 
-        session = get_active_session(self.service)
+        session = get_active_session_for(self.service)
 
         force_local = kwargs.pop("force_local", True)
         if self._has_implementation and force_local:
@@ -177,13 +177,13 @@ class remote_procedure_model[I, O](_shared.procedure_model[I, O]):
         return procedure
 
 
-_service_active_sessions = {}
+_active_session_registry = {}
 
 
-def get_active_session(
+def get_active_session_for(
     service: "remote_service",
 ) -> "remote_service_session":
-    session = _service_active_sessions.get(service.pre)
+    session = _active_session_registry.get(service.pre)
     if session is None:
         raise RuntimeError(f"active session for service {service.pre} not found")
     return session
@@ -196,15 +196,18 @@ class remote_service_session(_session.Almanet):
         super().__init__(*args, **kwargs)
 
     async def join(self, *args, **kwargs):
-        _service_active_sessions[self._remote_service.pre] = self
+        _active_session_registry[self._remote_service.pre] = self
         return await super().join(*args, **kwargs)
 
     async def leave(self, *args, **kwargs):
-        _service_active_sessions.pop(self._remote_service.pre, None)
+        _active_session_registry.pop(self._remote_service.pre, None)
         return await super().leave(*args, **kwargs)
 
 
 class remote_service:
+
+    _session_class: type[remote_service_session] = remote_service_session
+
     def __init__(
         self,
         prepath: str,
@@ -220,7 +223,7 @@ class remote_service:
         self.background_tasks = _shared.background_tasks()
         self._post_join_event = _shared.observable_event()
         self._post_join_event.add_observer(self._share_all)
-        _registry[self.pre] = self
+        _service_registry[self.pre] = self
 
     @property
     def routes(self) -> set[str]:
@@ -369,13 +372,24 @@ class remote_service:
         if self.include_to_api:
             self._share_self_schema(session)
 
-    def connect(self) -> remote_service_session:
-        return remote_service_session(self, self.transport)
+    def make_session(
+        self,
+    ) -> remote_service_session:
+        return self._session_class(self, self.transport)
+
+    async def include_into(
+        self,
+        parent_session: _session.Almanet,
+    ) -> remote_service_session:
+        child_session = self.make_session()
+        await child_session.join()
+        parent_session._leave_event.add_observer(child_session.leave)
+        return child_session
 
 
 new_remote_service = remote_service
 
-_registry = {}
+_service_registry = {}
 
 
 def get_service(
@@ -384,4 +398,4 @@ def get_service(
     """
     Returns the service object for the given uri.
     """
-    return _registry.get(uri)
+    return _service_registry.get(uri)

@@ -40,8 +40,7 @@ async def test_rpc(
     delay=3,  # delay for the event
     n=128,  # number of calls
 ):
-    session = almanet.transports.make_ansqd_tcp_session("localhost:4150")
-    async with session:
+    async with almanet.transports.make_ansqd_tcp_session("localhost:4150") as session:
         session.register(USE_ASYNCIO_EVENT_URI, use_asyncio_event)
         session.register(GREET_URI, greet)
 
