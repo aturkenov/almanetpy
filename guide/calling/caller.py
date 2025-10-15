@@ -4,8 +4,8 @@ import guide.microservice
 
 
 async def main():
-    # join to your network.
-    async with guide.microservice.greeting_remote_service.connect():
+    # Join to remote network
+    async with guide.microservice.greeting_remote_service.make_session():
         payload = "Aidar"
 
         # catching rpc exceptions with `try` and `except almanet.remote_exception` statement

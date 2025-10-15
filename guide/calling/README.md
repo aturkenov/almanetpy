@@ -24,8 +24,8 @@ import asyncio
 import almanet
 
 async def main():
-    session = almanet.transports.make_ansqd_tcp_session("localhost:4150")
-    async with session:  # Connect to your network
+    # Join to remote network
+    async with guide.microservice.greeting_remote_service.make_session():
         try:
             result = await guide.microservice.greet("Aidar")  # Call the greeting procedure
             print(f"Result: {result}")  # Print the Result: 'Hello, Aidar'
