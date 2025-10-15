@@ -177,16 +177,19 @@ class remote_procedure_model[I, O](_shared.procedure_model[I, O]):
         return procedure
 
 
-_active_session_registry = {}
+_active_session_registry: typing.MutableMapping[str, list["remote_service_session"]] = {}
 
 
 def get_active_session_for(
     service: "remote_service",
 ) -> "remote_service_session":
-    session = _active_session_registry.get(service.pre)
-    if session is None:
+    sessions = _active_session_registry.get(service.pre, list())
+    if len(sessions) == 0:
         raise RuntimeError(f"active session for service {service.pre} not found")
-    return session
+    # load balancing
+    i = sessions.pop(0)
+    sessions.append(i)
+    return i
 
 
 class remote_service_session(_session.Almanet):
@@ -196,11 +199,17 @@ class remote_service_session(_session.Almanet):
         super().__init__(*args, **kwargs)
 
     async def join(self, *args, **kwargs):
-        _active_session_registry[self._remote_service.pre] = self
+        sessions = _active_session_registry.get(self._remote_service.pre)
+        if sessions is None:
+            sessions = []
+            _active_session_registry[self._remote_service.pre] = sessions
+        sessions.append(self)
         return await super().join(*args, **kwargs)
 
     async def leave(self, *args, **kwargs):
-        _active_session_registry.pop(self._remote_service.pre, None)
+        sessions = _active_session_registry.get(self._remote_service.pre)
+        if isinstance(sessions, list):
+            sessions.remove(self)
         return await super().leave(*args, **kwargs)
 
 
