@@ -15,18 +15,20 @@ def serve_single(
     *,
     stop_loop_on_exit: bool = True,
 ) -> None:
+    loop = asyncio.get_event_loop()
     session = service.make_session()
+
+    ready_to_exit = asyncio.Event()
+    session._leave_event.add_observer(lambda *_: ready_to_exit.set())
 
     async def begin() -> None:
         await session.join()
         await service._post_join_event.notify(session)
 
     async def end() -> None:
-        await session.leave()
+        await ready_to_exit.wait()
         if stop_loop_on_exit:
             loop.stop()
-
-    loop = asyncio.get_event_loop()
 
     for s in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(s, lambda: loop.create_task(end()))

@@ -118,22 +118,6 @@ To run the greeting microservice, you can execute the following command:
 python -m guide.microservice.__demon
 ```
 
-### 5. Connecting external remote services (optional)
-
-```python
-# __demon.py
-import almanet
-
-import guide.another_microservice
-
-from . import _greeting
-
-
-@_greeting.public.remote_service.post_join
-async def __post_join(session: almanet.Almanet):
-    await guide.another_microservice.remote_service.include_into(session)
-```
-
 ### Microservice Architecture Summary
 
 - **`greeting.py`**: Public header file containing the interfaces to be used by other modules.
