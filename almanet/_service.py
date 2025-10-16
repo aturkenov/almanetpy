@@ -1,3 +1,5 @@
+import asyncio
+import signal
 import typing
 
 import pydantic_core
@@ -123,7 +125,7 @@ class remote_procedure_model[I, O](_shared.procedure_model[I, O]):
         """
         _session.logger.debug(f"local execution {self.uri}")
 
-        session = get_active_session_for(self.service)
+        session = await acquire_active_session(self.service)
 
         force_local = kwargs.pop("force_local", True)
         if self._has_implementation and force_local:
@@ -180,12 +182,20 @@ class remote_procedure_model[I, O](_shared.procedure_model[I, O]):
 _active_session_registry: typing.MutableMapping[str, list["remote_service_session"]] = {}
 
 
-def get_active_session_for(
+async def acquire_active_session(
     service: "remote_service",
+    autojoin: bool = True,
 ) -> "remote_service_session":
     sessions = _active_session_registry.get(service.pre, list())
     if len(sessions) == 0:
-        raise RuntimeError(f"active session for service {service.pre} not found")
+        if autojoin:
+            _active_session_registry[service.pre] = sessions
+            i = service.make_session()
+            await i.join()
+            sessions.append(i)
+        else:
+            raise RuntimeError(f"active session for service {service.pre} not found")
+
     # load balancing
     i = sessions.pop(0)
     sessions.append(i)
@@ -193,6 +203,8 @@ def get_active_session_for(
 
 
 class remote_service_session(_session.Almanet):
+
+    _LEAVE_SIGNALS = (signal.SIGINT, signal.SIGTERM)
 
     def __init__(self, service: "remote_service", *args, **kwargs):
         self._remote_service = service
@@ -204,6 +216,11 @@ class remote_service_session(_session.Almanet):
             sessions = []
             _active_session_registry[self._remote_service.pre] = sessions
         sessions.append(self)
+
+        loop = asyncio.get_event_loop()
+        for s in self._LEAVE_SIGNALS:
+            loop.add_signal_handler(s, lambda: loop.create_task(self.leave()))
+
         return await super().join(*args, **kwargs)
 
     async def leave(self, *args, **kwargs):
@@ -385,15 +402,6 @@ class remote_service:
         self,
     ) -> remote_service_session:
         return self._session_class(self, self.transport)
-
-    async def include_into(
-        self,
-        parent_session: _session.Almanet,
-    ) -> remote_service_session:
-        child_session = self.make_session()
-        await child_session.join()
-        parent_session._leave_event.add_observer(child_session.leave)
-        return child_session
 
 
 new_remote_service = remote_service

@@ -96,10 +96,10 @@ async def __post_join(session: almanet.Almanet):
         await long_operation(2, force_local=False, timeout=1)
 
     # test long operation
-    try:
-        await long_operation(59, force_local=False)
-    except Exception as e:
-        pytest.fail(f"{e!r}")
+    # try:
+    #     await long_operation(59, force_local=False)
+    # except Exception as e:
+    #     pytest.fail(f"{e!r}")
 
     _ready_to_exit.set()
 

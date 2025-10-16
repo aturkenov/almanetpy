@@ -24,13 +24,11 @@ import asyncio
 import almanet
 
 async def main():
-    # Join to remote network
-    async with guide.microservice.greeting_remote_service.make_session():
-        try:
-            result = await guide.microservice.greet("Aidar")  # Call the greeting procedure
-            print(f"Result: {result}")  # Print the Result: 'Hello, Aidar'
-        except almanet.remote_exception as e:
-            print(f"Error calling procedure: {e}")
+    try:
+        result = await guide.microservice.greet("Aidar")  # Call the greeting procedure
+        print(f"Result: {result}")  # Print the Result: 'Hello, Aidar'
+    except almanet.remote_exception as e:
+        print(f"Error calling procedure: {e}")
 
 if __name__ == '__main__':
     asyncio.run(main())
